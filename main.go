@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+        "strings"
 	"time"
+
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/configservice"
@@ -19,6 +21,7 @@ type Compliance struct {
 	Compliance     string
 	CapExceeded    bool
 	CappedCount    int64
+	Env            string
 }
 
 var (
@@ -29,11 +32,13 @@ var (
 		Name:      "compliance",
 		Help:      "Number of compliance",
 	},
-		[]string{"config_rule_name", "compliance", "cap_exceeded"},
+		[]string{"config_rule_name", "compliance", "cap_exceeded", "env"},
 	)
 )
 
 func main() {
+        fmt.Println("AWS Config Prometheus Exporter starting on port 8083")
+        fmt.Println(getEnvironment())
 	interval, err := getInterval()
 	if err != nil {
 		log.Fatal(err)
@@ -54,7 +59,7 @@ func main() {
 			}
 		}
 	}()
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8083", nil))
 }
 
 func snapshot() error {
@@ -70,6 +75,7 @@ func snapshot() error {
 			"config_rule_name": Compliance.ConfigRuleName,
 			"compliance":       Compliance.Compliance,
 			"cap_exceeded":     strconv.FormatBool(Compliance.CapExceeded),
+			"env":       Compliance.Env,
 		}
 		compliance.With(labels).Set(float64(Compliance.CappedCount))
 	}
@@ -77,8 +83,17 @@ func snapshot() error {
 	return nil
 }
 
+
+func getEnvironment() string {
+        var envstring = os.Getenv("AWS_CONFIG_SCRAPE_PREFIX")
+        if len(envstring) == 0 {
+          log.Fatal("You need to specify the env variable AWS_CONFIG_SCRAPE_PREFIX")
+        } 
+        return envstring
+}
+
 func getInterval() (int, error) {
-	const defaultAWSAPIIntervalSecond = 300
+	const defaultAWSAPIIntervalSecond = 10
 	AWSAPIInterval := os.Getenv("AWS_API_INTERVAL")
 	if len(AWSAPIInterval) == 0 {
 		return defaultAWSAPIIntervalSecond, nil
@@ -101,15 +116,14 @@ func getcompliances() ([]Compliance, error) {
 
 	svc := configservice.New(sess)
 	input := &configservice.DescribeComplianceByConfigRuleInput{}
-
+	var env = getEnvironment()
 	for {
 		ret, err := svc.DescribeComplianceByConfigRule(input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to describe compliance: %w", err)
 		}
-
-		result = append(result, ret.ComplianceByConfigRules...)
-
+                filtered := filterByEnv(env, ret.ComplianceByConfigRules)
+                result = append(result, filtered...)
 		// pagination
 		if ret.NextToken == nil {
 			break
@@ -121,7 +135,6 @@ func getcompliances() ([]Compliance, error) {
 	for i, comp := range result {
 		var CapExceeded bool
 		var CappedCount int64
-
 		if comp.Compliance.ComplianceContributorCount != nil {
 			CapExceeded = *comp.Compliance.ComplianceContributorCount.CapExceeded
 			CappedCount = *comp.Compliance.ComplianceContributorCount.CappedCount
@@ -132,8 +145,19 @@ func getcompliances() ([]Compliance, error) {
 			Compliance:     *comp.Compliance.ComplianceType,
 			CapExceeded:    CapExceeded,
 			CappedCount:    CappedCount,
+                        Env:		env,
 		}
 	}
 
 	return Compliances, nil
+}
+
+func filterByEnv(env string, rules []*configservice.ComplianceByConfigRule) []*configservice.ComplianceByConfigRule {
+  var filteredSlice []*configservice.ComplianceByConfigRule
+  for _, element := range rules {
+    if(strings.Contains(*element.ConfigRuleName, env)){
+      filteredSlice = append(filteredSlice, element)
+    }
+  }
+  return filteredSlice
 }

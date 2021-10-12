@@ -1,4 +1,4 @@
-module github.com/chaspy/aws-config-compliance-prometheus-exporter
+module github.com/ViralGains/aws-config-compliance-prometheus-exporter
 
 go 1.15
 
