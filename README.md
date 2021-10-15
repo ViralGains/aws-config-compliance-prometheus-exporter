@@ -1,6 +1,6 @@
 # aws-config-compliance-prometheus-exporter
 Prometheus Exporter for AWS Config Compliance
-
+(forked from chaspy - thanks!)
 ## How to run
 
 ### Local
@@ -9,20 +9,24 @@ Prometheus Exporter for AWS Config Compliance
 $ go run main.go
 ```
 
+
+### Environment Variables needed
+AWS_CONFIG_SCRAPE_PREFIX should be set and is used to determine which rules to alert on.  
+
+This allows us to alert based on environment.
+
+AWS_API_INTERVAL specifies how often to scrape.  Defaults to 60 seconds if you do not set it.
+
+
+AWS_REGION you will need to set this if you are running in an environment that uses IAM role instead of an aws config.  
 ### Binary
 
-Get the binary file from [Releases](https://github.com/chaspy/aws-config-compliance-prometheus-exporter/releases) and run it.
-
-### Docker
-
-```
-$ docker run chaspy/aws-config-compliance-prometheus-exporter:v0.1.0
-```
+Get the binary file from [Releases](https://github.com/ViralGains/aws-config-compliance-prometheus-exporter/releases) and run it.
 
 ## Metrics
 
 ```
-$ curl -s localhost:8080/metrics | grep aws_custom_config_compliance
+$ curl -s localhost:8083/metrics | grep aws_custom_config_compliance
 # HELP aws_custom_config_compliance Number of compliance
 # TYPE aws_custom_config_compliance gauge
 aws_custom_config_compliance{cap_exceeded="false",compliance="COMPLIANT",config_rule_name="securityhub-efs-encrypted-check-bd414301"} 0
@@ -52,6 +56,3 @@ The following policy must be attached to the AWS role to be executed.
 }
 ```
 
-## Datadog Autodiscovery
-
-If you use Datadog, you can use [Kubernetes Integration Autodiscovery](https://docs.datadoghq.com/agent/kubernetes/integrations/?tab=kubernetes) feature.

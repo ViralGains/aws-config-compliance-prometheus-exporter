@@ -103,7 +103,6 @@ func getInterval() (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to read Datadog Config: %w", err)
 	}
-
 	return integerAWSAPIInterval, nil
 }
 
@@ -155,7 +154,7 @@ func getcompliances() ([]Compliance, error) {
 func filterByEnv(env string, rules []*configservice.ComplianceByConfigRule) []*configservice.ComplianceByConfigRule {
   var filteredSlice []*configservice.ComplianceByConfigRule
   for _, element := range rules {
-    if(strings.Contains(*element.ConfigRuleName, env)){
+    if(strings.HasPrefix(*element.ConfigRuleName, env)){
       filteredSlice = append(filteredSlice, element)
     }
   }
